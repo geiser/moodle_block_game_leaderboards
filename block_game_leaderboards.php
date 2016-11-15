@@ -61,6 +61,18 @@ class block_game_leaderboards extends block_base {
     public function get_content() {
         global $USER, $PAGE, $CFG, $DB, $OUTPUT;
 
+        //uglyhack to hide ranking based on the groupname indicated in the title 
+        $matches = array(); preg_match("/\(\w+\)/", $this->title, $matches);
+        if (user_has_role_assignment($USER->id, 5) && !empty($matches)) {
+            if (!$DB->record_exists_sql('SELECT * FROM {groups_members} m
+                    INNER JOIN {groups} g ON g.id = m.groupid
+                    WHERE g.name = :name AND m.userid = :userid',
+                    array('name'=>substr($matches[0],1,-1),
+                          'userid'=>$USER->id))) {
+                return ;
+            }
+        }
+
         $this->content = new stdClass();
 
         if(isset($this->config->blockinstanceid)) {
@@ -81,6 +93,13 @@ class block_game_leaderboards extends block_base {
 
             $leaderboard_url = new moodle_url('/blocks/game_leaderboards/leaderboard.php', array('courseid' => $this->page->course->id, 'blockinstanceid' => $this->instance->id, 'startdate' => $startdate, 'enddate' => time()));
             $this->content->text .= html_writer::link($leaderboard_url, get_string('block_seeall', 'block_game_leaderboards'));
+        }
+
+
+        //uglyhack to remove what is in parenteses
+        if(user_has_role_assignment($USER->id, 5)) {
+            // Verificar se é estudante? inverter e colcoar contexto pode ser melhor
+            $this->title = preg_replace(array("/\(\w+\)/"), array(""), $this->title);
         }
 
         return $this->content;
