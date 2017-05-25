@@ -83,9 +83,22 @@ function get_leaderboard($blockinstanceid, $courseid, $startdate, $enddate, $sea
 		}
 	}
 	else { // Show groups points
-		foreach($leaderboard_groups as $groupid => $leaderboard_group) {
-			$text = '<li>' . groups_get_group_name($groupid) . ': ' . $leaderboard_group . ' ' . get_string('configpage_points', 'block_game_leaderboards') . '</li>';
-			
+        foreach($leaderboard_groups as $groupid => $leaderboard_group) {
+            $text = '';
+            $group = $DB->get_record('groups', array("id"=>$groupid));
+            if ($group->picture) {
+                $file = 'f2';
+                $pcontext = context_course::instance($courseid); 
+                $grouppictureurl = moodle_url::make_pluginfile_url($pcontext->id, 'group',
+                    'icon', $group->id, '/', $file);
+                $grouppictureurl->param('rev', $group->picture);
+                $text .= '<img class="grouppicture" src="'.$grouppictureurl.'"'.
+                            ' alt="'.s(get_string('group').' '.$group->name).'" title="'.s($group->name).'"/>';
+            }
+            
+			$text = '<li>'. $text. groups_get_group_name($groupid) . ': ' . $leaderboard_group . ' ' . get_string('configpage_points', 'block_game_leaderboards') . '</li>';
+			//var_dump($text);
+            //die;
 			if(groups_is_member($groupid, $searchuserid)) {
 				$text = '<b>' . $text . '</b>';
 				if(is_null($found_userid)) {
