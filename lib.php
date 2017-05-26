@@ -24,7 +24,73 @@
 
 require_once($CFG->libdir . "/badgeslib.php");
 
-function get_leaderboard($blockinstanceid, $courseid, $startdate, $enddate, $searchuserid = 0, $limit = 0) {
+function print_badges($badges, $userid, $profile = false, $external = false) {
+        global $USER, $CFG;
+        foreach ($badges as $badge) {
+            if (!$external) {
+                $context = ($badge->type == BADGE_TYPE_SITE) ? context_system::instance() : context_course::instance($badge->courseid);
+                $bname = $badge->name;
+                $imageurl = moodle_url::make_pluginfile_url($context->id, 'badges', 'badgeimage', $badge->id, '/', 'f1', false);
+            } else {
+                $bname = s($badge->assertion->badge->name);
+                $imageurl = $badge->imageUrl;
+            }
+
+            $name = html_writer::tag('span', $bname, array('class' => 'badge-name'));
+
+            $image = html_writer::empty_tag('img', array('src' => $imageurl, 'class' => 'badge-image', 'style'=>'width: 32px; height: 32px;'));
+            if (!empty($badge->dateexpire) && $badge->dateexpire < time()) {
+                $image .= $this->output->pix_icon('i/expired',
+                        get_string('expireddate', 'badges', userdate($badge->dateexpire)),
+                        'moodle',
+                        array('class' => 'expireimage'));
+                $name .= '(' . get_string('expired', 'badges') . ')';
+            }
+
+            $download = $status = $push = '';
+            if (($userid == $USER->id) && !$profile) {
+                $url = new moodle_url('mybadges.php', array('download' => $badge->id, 'hash' => $badge->uniquehash, 'sesskey' => sesskey()));
+                $notexpiredbadge = (empty($badge->dateexpire) || $badge->dateexpire > time());
+                $backpackexists = badges_user_has_backpack($USER->id);
+                if (!empty($CFG->badges_allowexternalbackpack) && $notexpiredbadge && $backpackexists) {
+                    $assertion = new moodle_url('/badges/assertion.php', array('b' => $badge->uniquehash));
+                    $action = new component_action('click', 'addtobackpack', array('assertion' => $assertion->out(false)));
+                    $push = $this->output->action_icon(new moodle_url('#'), new pix_icon('t/backpack', get_string('addtobackpack', 'badges')), $action);
+                }
+
+                $download = $this->output->action_icon($url, new pix_icon('t/download', get_string('download')));
+                if ($badge->visible) {
+                    $url = new moodle_url('mybadges.php', array('hide' => $badge->issuedid, 'sesskey' => sesskey()));
+                    $status = $this->output->action_icon($url, new pix_icon('t/hide', get_string('makeprivate', 'badges')));
+                } else {
+                    $url = new moodle_url('mybadges.php', array('show' => $badge->issuedid, 'sesskey' => sesskey()));
+                    $status = $this->output->action_icon($url, new pix_icon('t/show', get_string('makepublic', 'badges')));
+                }
+            }
+
+            if (!$profile) {
+                $url = new moodle_url('badge.php', array('hash' => $badge->uniquehash));
+            } else {
+                if (!$external) {
+                    $url = new moodle_url('/badges/badge.php', array('hash' => $badge->uniquehash));
+                } else {
+                    $hash = hash('md5', $badge->hostedUrl);
+                    $url = new moodle_url('/badges/external.php', array('hash' => $hash, 'user' => $userid));
+                }
+            }
+            $actions = html_writer::tag('div', $push . $download . $status, array('class' => 'badge-actions'));
+            $items[] = html_writer::tag('span', $image); //
+            //$items[] = html_writer::link($url, $image . $actions . $name, array('title' => $bname));
+        }
+        $toreturn = " ";
+        foreach($items as $item) $toreturn .= $item;
+        return $toreturn;
+        //return html_writer::alist($items, array('class' => 'badges'));
+    }
+
+
+
+function get_leaderboard($blockinstanceid, $courseid, $startdate, $enddate, $searchuserid = 0, $limit = 0, $limit_badges = 0, $class_badges) {
 	global $DB, $OUTPUT, $PAGE;
 
 	$block_info = $DB->get_record('block_instances', array('id' => $blockinstanceid));
@@ -46,20 +112,31 @@ function get_leaderboard($blockinstanceid, $courseid, $startdate, $enddate, $sea
 
 		foreach($leaderboard_users as $userid => $leaderboard_user) {
 			$info = $DB->get_record('user', array('id' => $userid));
-			$text = '<li>' . $OUTPUT->user_picture($info, array('size' => 24, 'alttext' => false)) . ' ' . $info->firstname . ' ' . $info->lastname . ': ' . $leaderboard_user . ' ' . get_string('configpage_points', 'block_game_leaderboards');
+			$text = '<li>' . $OUTPUT->user_picture($info, array('size' => 32, 'alttext' => false)) . ' ' . $info->firstname . ' ' . $info->lastname . ': ' . $leaderboard_user . ' ' . get_string('configpage_points', 'block_game_leaderboards');
 
-			// Print user badges
-			/*if ($courseid == SITEID) {
-				$badges_courseid = null;
-			}
-			else {
-				$badges_courseid = $courseid;
-			}
+            // Print user badges
+            if ($limit_badges != 0) {
 
-			$output = $PAGE->get_renderer('core', 'badges');
-			if ($user_badges = badges_get_user_badges($userid, $courseid, 0, 2)) {
-				$text .= $output->print_badges_list($user_badges, $userid, true);
-			}*/
+
+
+	    		if ($courseid == SITEID) {
+		    		$badges_courseid = null;
+			    }
+		    	else {
+			    	$badges_courseid = $courseid;
+			    }
+
+                $output = $PAGE->get_renderer('core', 'badges');
+                $perpage = 0;
+                if ($limit_badges > 0) $perpage = $limit_badges;
+                if ($user_badges = badges_get_user_badges($userid, $courseid, 0, $perpage)) {
+
+
+                    //var_dump($user_badges);
+                    $text .= print_badges($user_badges, $userid);
+		    		//$text .= $output->print_badges_list($user_badges, $userid, true);
+                }
+            }
 
 			// List user groups if groupmode is separate groups
 			if($block_instance->config->groupmode == SEPARATEGROUPS) {

@@ -64,7 +64,7 @@ class block_game_leaderboard_form extends moodleform {
         $enddate = $enddate_element->getValue();
 
 		// Print leaderboard content
-		$content = get_leaderboard($blockinstanceid, $courseid, $startdate, $enddate, $USER->id);
+		$content = get_leaderboard($blockinstanceid, $courseid, $startdate, $enddate, $USER->id, 0, -1);
 		$mform->addElement('html', $content);
     }
 

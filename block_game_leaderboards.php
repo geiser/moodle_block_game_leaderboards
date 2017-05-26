@@ -89,7 +89,7 @@ class block_game_leaderboards extends block_base {
                 $startdate = 0;
             }
 
-            $this->content->text = get_leaderboard($this->instance->id, $this->page->course->id, $startdate, time(), $USER->id, $this->config->size);
+            $this->content->text = get_leaderboard($this->instance->id, $this->page->course->id, $startdate, time(), $USER->id, $this->config->size, 0);
 
             $leaderboard_url = new moodle_url('/blocks/game_leaderboards/leaderboard.php', array('courseid' => $this->page->course->id, 'blockinstanceid' => $this->instance->id, 'startdate' => $startdate, 'enddate' => time()));
             $this->content->text .= html_writer::link($leaderboard_url, get_string('block_seeall', 'block_game_leaderboards'));
